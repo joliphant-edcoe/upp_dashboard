@@ -80,30 +80,42 @@ def server(input, output, session):
         if not input_districts:
             return
         fig, ax = plt.subplots()
-        if input.charter():
-            plotdata = (
-                aggregate.query("LEA.isin(@input_districts)")
-                .groupby(["YEAR", "LEA"])
-                .enrollment.sum()
-                .unstack()
-            )
+
+        if not input.charter():
+            plotdata = aggregate.query("charter == False")
         else:
-            plotdata = (
-                aggregate.query("LEA.isin(@input_districts)")
-                .query("charter == False")
-                .groupby(["YEAR", "LEA"])
-                .enrollment.sum()
-                .unstack()
-            )
+            plotdata = aggregate
+
+        plotdata_df = (
+            plotdata.query("LEA.isin(@input_districts)")
+            .groupby(["YEAR", "LEA"])
+            .enrollment.sum()
+            .unstack()
+        )
+
         if input.normalize():
-            plotdata2 = 100 * plotdata.div(plotdata.iloc[0, :])
+            plotdata_normalized = 100 * plotdata_df.div(plotdata_df.iloc[0, :])
         else:
-            plotdata2 = plotdata
-        plotdata2.plot(
+            plotdata_normalized = plotdata_df
+
+        final_plotdata = plotdata_normalized.sort_values(
+            plotdata_normalized.last_valid_index(), axis=1, ascending=False
+        )
+
+        final_plotdata.plot(
             ax=ax,
             linewidth=3,
-            style="-o",
+            style=["-o", "-^", "-s", "->", "--o", "--^", "--s", "-->"] * 4,
         )
+
+        for i, v in enumerate(final_plotdata.iloc[-1, :]):
+            ax.text(
+                len(final_plotdata) - 1 + 0.3 * (i % 2),
+                v,
+                f"{v:.0f}",
+                fontdict={"fontsize": "10"},
+            )
+
         ax.grid(True)
         plt.legend(bbox_to_anchor=(0.5, -0.25), loc="lower center", ncol=4)
 
@@ -115,35 +127,43 @@ def server(input, output, session):
         fig, ax = plt.subplots()
 
         if input.charter():
-            (
+            plotdata = (
                 aggregate.query("LEA.isin(@input_districts)")
                 .groupby(["YEAR", "LEA"])
                 .sum()
                 .assign(UPP=lambda df_: df_.undupMealEng / df_.enrollment)
                 .UPP.unstack()
-                .plot(
-                    ax=ax,
-                    linewidth=3,
-                    style="-o",
-                )
             )
-
         else:
-            (
+            plotdata = (
                 aggregate.query("LEA.isin(@input_districts)")
                 .query("charter==False")
                 .groupby(["YEAR", "LEA"])
                 .sum()
                 .assign(UPP=lambda df_: df_.undupMealEng / df_.enrollment)
                 .UPP.unstack()
-                .plot(
-                    ax=ax,
-                    linewidth=3,
-                    style="-o",
-                )
+            )
+        final_plotdata = plotdata.sort_values(
+            plotdata.last_valid_index(), axis=1, ascending=False
+        )
+        final_plotdata.plot(
+            ax=ax,
+            linewidth=3,
+            style=["-o", "-^", "-s", "->", "--o", "--^", "--s", "-->"] * 4,
+        )
+        xlims = ax.get_xlim()
+        ax.plot(xlims, [0.55, 0.55], "k:")
+        ax.set_xlim(xlims)
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0, 0))
+
+        for i, v in enumerate(final_plotdata.iloc[-1, :]):
+            ax.text(
+                len(final_plotdata) - 1 + 0.3 * (i % 2),
+                v,
+                f"{v:.0%}",
+                fontdict={"fontsize": "10"},
             )
 
-        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0, 0))
         ax.grid(True)
         plt.legend(bbox_to_anchor=(0.5, -0.25), loc="lower center", ncol=4)
 
@@ -151,7 +171,7 @@ def server(input, output, session):
     @reactive.event(input.selectAll)
     def _():
         ui.update_checkbox_group("districts", selected=districts)
-        
+
     @reactive.effect
     @reactive.event(input.selectNone)
     def _():
