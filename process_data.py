@@ -57,7 +57,7 @@ for f in files:
         )
     )
 
- 
+
 all_df = pd.concat(df_list).assign(LEA=lambda df_: df_.LEACode.map(district_names))
 aggregate = (
     all_df.groupby(["LEA", "YEAR", "charter"])
@@ -71,8 +71,6 @@ aggregate = (
     .reset_index()
 )
 
-print(all_df)
-print(all_df.YEAR.value_counts())
 
 countyAggregate = (
     all_df.groupby(["YEAR", "charter"])
@@ -84,4 +82,10 @@ countyAggregate = (
         countyUndupMealEng=("LEAUndupELMealTotal", "first"),
     )
     .reset_index()
+)
+
+homelessFoster = all_df.groupby(["YEAR"]).agg(
+    homeless=("Homeless", "sum"),
+    foster=("FosterPlacement", "sum"),
+    tribalfoster=("TribalFosterYouth", "sum"),
 )
